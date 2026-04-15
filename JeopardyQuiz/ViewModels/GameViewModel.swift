@@ -20,7 +20,7 @@ class GameViewModel: ObservableObject {
     @Published var selectedCell: BoardCell? = nil
     @Published var showQuestionModal: Bool = false
     @Published var answerVisible: Bool = false
-    @Published var selectedOptionId: Int? = nil   // per scelta multipla
+    @Published var selectedOptionId: String? = nil   // per scelta multipla
 
     // MARK: - Fine partita
     @Published var isGameOver: Bool = false

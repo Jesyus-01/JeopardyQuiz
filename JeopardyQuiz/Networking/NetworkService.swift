@@ -121,6 +121,8 @@ final class NetworkService {
             }
 
             let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {

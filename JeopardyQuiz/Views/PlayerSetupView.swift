@@ -83,7 +83,7 @@ struct PlayerSetupView: View {
         return allHaveAvatar && allHaveName && uniqueNames && uniqueAvatars
     }
 
-    private func usedAvatarIds(excluding index: Int) -> Set<Int> {
+    private func usedAvatarIds(excluding index: Int) -> Set<String> {
         Set(
             gameViewModel.players
                 .indices
@@ -109,7 +109,7 @@ struct PlayerCardView: View {
     @Binding var player: Player
     let playerNumber: Int
     let availableAvatars: [Avatar]
-    let usedAvatarIds: Set<Int>
+    let usedAvatarIds: Set<String>
     let usedNames: Set<String>
     let theme: AppTheme
 

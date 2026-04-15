@@ -7,22 +7,22 @@
 import Foundation
 
 enum QuestionType: String, Codable {
-    case open            = "open"
-    case multipleChoice  = "multiple_choice"
-    case image           = "image"
-    case audio           = "audio"
+    case open            = "OPEN"
+    case multipleChoice  = "MCQ"
+    case image           = "IMAGE"
+    case audio           = "AUDIO"
 }
 
 struct Question: Codable, Identifiable {
-    let questionId: String          // ← String
-    let categoryId: String          // ← String
+    let questionId: String
+    let categoryId: String
     let text: String
-    let questionType: String        // "OPEN" | "MCQ"
+    let questionType: QuestionType   // ← torna da String a QuestionType
     let difficultyLevel: Int
     let basePoints: Int
-    let correctOpenAnswer: String?  // ← opzionale (null per le MCQ)
+    let correctOpenAnswer: String?
     let externalCode: String
-    
+
     var id: String { questionId }
     
     enum CodingKeys: String, CodingKey {

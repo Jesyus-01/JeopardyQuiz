@@ -57,7 +57,7 @@ final class QuizGeneratorService {
 
         // Costruisce la griglia selezionando 1 domanda random per cella
         // Usa un Set per tracciare gli ID già usati (no duplicati nella stessa partita)
-        var usedIds = Set<Int>()
+        var usedIds = Set<String>()
         let columns: [[BoardCell]] = categoryOrder.compactMap { catName -> [BoardCell]? in
             guard categoryMap[catName] != nil else { return nil }
 
