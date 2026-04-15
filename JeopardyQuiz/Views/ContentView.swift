@@ -1,37 +1,19 @@
-//
-//  ContentView.swift
-//  JeopardyQuiz
-//
-//  Created by Jesyus on 09/04/26.
-//
-
-
 import SwiftUI
 
 struct ContentView: View {
-    @StateObject private var viewModel = GameViewModel()
-    @EnvironmentObject var themeManager: ThemeManager
-    
-    @State private var isGameStarted = false
-    
+    @StateObject private var gameViewModel = GameViewModel()
+    // ThemeManager arriva dall'App, non lo creiamo qui
+
     var body: some View {
-        let theme = AppTheme(themeManager.scheme)
-        
-        ZStack {
-            theme.bgDark.ignoresSafeArea()
-            
-            if isGameStarted {
-                GameBoardView(viewModel: viewModel)
-                    .transition(.opacity)
-            } else {
-                HomeView(onStart: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isGameStarted = true
-                    }
-                })
-                .transition(.opacity)
+        Group {
+            switch gameViewModel.currentScreen {
+            case .home:        HomeView()
+            case .playerSetup: PlayerSetupView()
+            case .board:       GameBoardView()
+            case .recap:       RecapView()
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: isGameStarted)
+        .environmentObject(gameViewModel)
+        .animation(.easeInOut(duration: 0.25), value: gameViewModel.currentScreen)
     }
 }

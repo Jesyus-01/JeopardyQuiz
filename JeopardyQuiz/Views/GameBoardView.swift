@@ -9,104 +9,202 @@
 import SwiftUI
 
 struct GameBoardView: View {
-    @ObservedObject var viewModel: GameViewModel
     @EnvironmentObject var themeManager: ThemeManager
-    
+    @EnvironmentObject var gameViewModel: GameViewModel
+
     var body: some View {
         let theme = AppTheme(themeManager.scheme)
-        
+
         ZStack {
-            // Sfondo
             theme.bgDark.ignoresSafeArea()
-            
-            HStack(spacing: 12) {
-                
-                // Colonna giocatori a sinistra
+
+            HStack(spacing: 0) {
+
+                // MARK: - Sidebar giocatori
                 VStack(spacing: 12) {
-                    PlayerPillView(name: "Giocatore 1", score: viewModel.score, isActive: true)
-                    Spacer()
-                }
-                .frame(width: 180)
-                
-                // Griglia categorie
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(viewModel.categories) { category in
-                            CategoryColumnView(category: category) { question in
-                                viewModel.selectQuestion(question)
-                            }
-                            .frame(width: 160)
-                        }
-                    }
-                    .padding(.horizontal, 4)
-                }
-            }
-            .padding(24)
-            .padding(.top, 8)
-            
-            // Dialog domanda
-            if case .questionSelected(let question) = viewModel.gameState {
-                QuestionDialogView(
-                    question: question,
-                    onCorrect: { viewModel.markCorrect(question) },
-                    onWrong: { viewModel.markWrong(question) },
-                    onClose: { viewModel.gameState = .idle }
-                )
-                .transition(.opacity)
-                .zIndex(10)
-            }
-            
-            if case .showingAnswer(let question) = viewModel.gameState {
-                QuestionDialogView(
-                    question: question,
-                    onCorrect: { viewModel.markCorrect(question) },
-                    onWrong: { viewModel.markWrong(question) },
-                    onClose: { viewModel.gameState = .idle }
-                )
-                .transition(.opacity)
-                .zIndex(10)
-            }
-            
-            // Loading
-            if viewModel.isLoading {
-                ZStack {
-                    theme.bgDark.opacity(0.8).ignoresSafeArea()
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: theme.text))
-                        .scaleEffect(1.5)
-                }
-            }
-            
-            // Errore
-            if let error = viewModel.errorMessage {
-                ZStack {
-                    theme.bgDark.opacity(0.9).ignoresSafeArea()
-                    VStack(spacing: 16) {
-                        Text("Errore di connessione")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(theme.text)
-                        Text(error)
-                            .font(.system(size: 14))
-                            .foregroundColor(theme.textMuted)
-                        Button("Riprova") {
-                            viewModel.loadGame()
-                        }
-                        .foregroundColor(theme.text)
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 10)
-                        .background(theme.bg)
-                        .cornerRadius(999)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 999)
-                                .stroke(theme.border, lineWidth: 1)
+                    ForEach(gameViewModel.players.indices, id: \.self) { index in
+                        PlayerPillView(
+                            player: gameViewModel.players[index],
+                            isActive: index == gameViewModel.activePlayerIndex
                         )
                     }
+                    Spacer()
+                }
+                .frame(width: 200)
+                .padding(.top, 24)
+                .padding(.leading, 16)
+
+                // MARK: - Tabellone
+                GeometryReader { geo in
+                    let columnCount = gameViewModel.board.count          // 5 categorie
+                    let rowCount    = gameViewModel.board.first?.count ?? 5  // 5 difficulty
+                    let spacing: CGFloat = 8
+                    let totalHSpacing = spacing * CGFloat(columnCount - 1)
+                    let totalVSpacing = spacing * CGFloat(rowCount)      // +1 per header
+                    let cellWidth  = (geo.size.width - totalHSpacing) / CGFloat(columnCount)
+                    let cellHeight = (geo.size.height - totalVSpacing) / CGFloat(rowCount + 1)
+
+                    VStack(spacing: spacing) {
+
+                        // Header categorie
+                        HStack(spacing: spacing) {
+                            ForEach(gameViewModel.board, id: \.first?.categoryName) { column in
+                                Text(column.first?.categoryName ?? "")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(theme.text)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.7)
+                                    .frame(width: cellWidth, height: cellHeight)
+                                    .background(theme.bg)
+                                    .cornerRadius(10)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .stroke(theme.border, lineWidth: 1)
+                                    )
+                            }
+                        }
+
+                        // Righe valori (difficulty 1→5)
+                        ForEach(0..<rowCount, id: \.self) { rowIndex in
+                            HStack(spacing: spacing) {
+                                ForEach(gameViewModel.board, id: \.first?.categoryName) { column in
+                                    if rowIndex < column.count {
+                                        let cell = column[rowIndex]
+                                        BoardCellView(
+                                            cell: cell,
+                                            width: cellWidth,
+                                            height: cellHeight,
+                                            theme: theme
+                                        ) {
+                                            gameViewModel.selectCell(cell)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
                 }
             }
+
+            // MARK: - Modal domanda
+            if gameViewModel.showQuestionModal,
+               let cell = gameViewModel.selectedCell {
+                QuestionModalView(cell: cell)
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                    .zIndex(10)
+            }
         }
-        .onAppear {
-            viewModel.loadGame()
+        .animation(.easeInOut(duration: 0.2), value: gameViewModel.showQuestionModal)
+    }
+}
+
+// MARK: - Cella del tabellone
+
+struct BoardCellView: View {
+    let cell: BoardCell
+    let width: CGFloat
+    let height: CGFloat
+    let theme: AppTheme
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(cell.isPlayed ? theme.bg.opacity(0.3) : theme.bg)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(theme.border, lineWidth: 1)
+                    )
+
+                if !cell.isPlayed {
+                    Text("\(cell.points)")
+                        .font(.system(size: pointsFontSize(for: width), weight: .light))
+                        .foregroundColor(theme.text)
+                } else {
+                    // Cella già giocata — vuota
+                    Rectangle()
+                        .fill(Color.clear)
+                }
+            }
+            .frame(width: width, height: height)
         }
-        .animation(.easeInOut(duration: 0.2), value: viewModel.gameState == .idle)
+        .disabled(cell.isPlayed)
+        .buttonStyle(.plain)
+    }
+
+    private func pointsFontSize(for width: CGFloat) -> CGFloat {
+        width > 140 ? 32 : width > 100 ? 26 : 20
+    }
+}
+
+// MARK: - Pill giocatore (sidebar)
+
+struct PlayerPillView: View {
+    let player: Player
+    let isActive: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+
+            // Avatar
+            avatarImage()
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+
+            // Nome + punteggio
+            VStack(alignment: .leading, spacing: 2) {
+                Text(player.name)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text("\(player.score)")
+                    .font(.system(size: 12))
+                    .foregroundColor(player.score < 0 ? .red : .white.opacity(0.7))
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(isActive ? 0.12 : 0.05))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    isActive ? Color.white.opacity(0.5) : Color.clear,
+                    lineWidth: 1.5
+                )
+        )
+        .padding(.trailing, 12)
+        .animation(.easeInOut(duration: 0.2), value: isActive)
+    }
+
+    @ViewBuilder
+    private func avatarImage() -> some View {
+        if let avatar = player.avatar {
+            let url = LocalStorageService.shared.localMediaURLSync(for: avatar.filename)
+            if let uiImage = UIImage(contentsOfFile: url.path) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                defaultAvatar()
+            }
+        } else {
+            defaultAvatar()
+        }
+    }
+
+    @ViewBuilder
+    private func defaultAvatar() -> some View {
+        ZStack {
+            Circle().fill(Color.white.opacity(0.1))
+            Image(systemName: "person.fill")
+                .foregroundColor(.white.opacity(0.5))
+        }
     }
 }
