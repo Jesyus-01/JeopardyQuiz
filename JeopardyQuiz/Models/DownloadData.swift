@@ -8,15 +8,6 @@ struct DownloadResponse: Codable {
     let choiceOptions: [ChoiceOption]
     let questionMedia: [QuestionMedia]
     let avatars: [Avatar]
-
-    enum CodingKeys: String, CodingKey {
-        case version
-        case categories
-        case questions
-        case choiceOptions = "choiceOptions"
-        case questionMedia = "questionMedia"
-        case avatars
-    }
 }
 
 // MARK: - GET /api/download/version

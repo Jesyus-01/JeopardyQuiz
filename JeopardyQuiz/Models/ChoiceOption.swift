@@ -8,19 +8,19 @@
 import Foundation
 
 struct ChoiceOption: Codable, Identifiable {
-    let optionId: Int
-    let questionId: Int
+    let optionId: String            // ← String
+    let questionId: String          // ← String
     let optionText: String
     let optionOrder: Int
     let isCorrect: Bool
-
-    var id: Int { optionId }
-
+    
+    var id: String { optionId }
+    
     enum CodingKeys: String, CodingKey {
-        case optionId    = "option_id"
-        case questionId  = "question_id"
-        case optionText  = "option_text"
+        case optionId = "option_id"
+        case questionId = "question_id"
+        case optionText = "option_text"
         case optionOrder = "option_order"
-        case isCorrect   = "is_correct"
+        case isCorrect = "is_correct"
     }
 }

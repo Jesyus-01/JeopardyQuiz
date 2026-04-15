@@ -39,8 +39,8 @@ class DownloadService: ObservableObject {
     // MARK: - Carica dati locali
 
     func loadLocalData() async {
-        localData    = try? await LocalStorageService.shared.loadDownloadData()
-        localVersion = await LocalStorageService.shared.loadVersion()
+        localData    = try? LocalStorageService.shared.loadDownloadData()
+        localVersion = LocalStorageService.shared.loadVersion()
     }
 
     // MARK: - Flusso download completo
@@ -97,7 +97,7 @@ class DownloadService: ObservableObject {
 
         for mediaFile in mediaFiles {
             // Salta se già scaricato
-            let alreadyExists = await LocalStorageService.shared.isMediaDownloaded(
+            let alreadyExists = LocalStorageService.shared.isMediaDownloaded(
                 filename: mediaFile.filename
             )
             if alreadyExists {
@@ -110,7 +110,7 @@ class DownloadService: ObservableObject {
             guard let url = URL(string: mediaFile.url) else { continue }
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
-                try await LocalStorageService.shared.saveMedia(
+                try LocalStorageService.shared.saveMedia(
                     data: data,
                     filename: mediaFile.filename
                 )
@@ -125,8 +125,8 @@ class DownloadService: ObservableObject {
 
         // Step 6: salva JSON e versione su disco
         do {
-            try await LocalStorageService.shared.saveDownloadData(downloadData)
-            try await LocalStorageService.shared.saveVersion(
+            try LocalStorageService.shared.saveDownloadData(downloadData)
+            try LocalStorageService.shared.saveVersion(
                 Int(Date().timeIntervalSince1970)
             )
         } catch {
@@ -143,7 +143,7 @@ class DownloadService: ObservableObject {
 
     func deleteLocalData() async {
         do {
-            try await LocalStorageService.shared.deleteAll()
+            try LocalStorageService.shared.deleteAll()
             localData    = nil
             localVersion = nil
             state        = .idle

@@ -134,8 +134,8 @@ class GameViewModel: ObservableObject {
 
     /// Percorso locale del file media
     func localMediaURL(for filename: String) async -> URL? {
-        let url = await LocalStorageService.shared.localMediaURL(for: filename)
-        let exists = await LocalStorageService.shared.isMediaDownloaded(filename: filename)
+        let url = LocalStorageService.shared.localMediaURL(for: filename)
+        let exists = LocalStorageService.shared.isMediaDownloaded(filename: filename)
         return exists ? url : nil
     }
 

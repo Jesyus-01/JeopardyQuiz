@@ -7,7 +7,7 @@
 
 import Foundation
 
-actor LocalStorageService {
+final class LocalStorageService {
 
     static let shared = LocalStorageService()
 

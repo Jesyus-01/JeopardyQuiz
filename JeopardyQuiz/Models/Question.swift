@@ -13,26 +13,26 @@ enum QuestionType: String, Codable {
     case audio           = "audio"
 }
 
-struct Question: Codable, Identifiable, Equatable {
-    let questionId: Int
-    let categoryId: Int
+struct Question: Codable, Identifiable {
+    let questionId: String          // ← String
+    let categoryId: String          // ← String
     let text: String
-    let questionType: QuestionType
-    let difficultyLevel: Int     // 1–5
-    let basePoints: Int          // 100–500
-    let correctOpenAnswer: String?
-    let externalCode: String?    // filename audio/immagine quando non c'è question_media
-
-    var id: Int { questionId }
-
+    let questionType: String        // "OPEN" | "MCQ"
+    let difficultyLevel: Int
+    let basePoints: Int
+    let correctOpenAnswer: String?  // ← opzionale (null per le MCQ)
+    let externalCode: String
+    
+    var id: String { questionId }
+    
     enum CodingKeys: String, CodingKey {
-        case questionId          = "question_id"
-        case categoryId          = "category_id"
+        case questionId = "question_id"
+        case categoryId = "category_id"
         case text
-        case questionType        = "question_type"
-        case difficultyLevel     = "difficulty_level"
-        case basePoints          = "base_points"
-        case correctOpenAnswer   = "correct_open_answer"
-        case externalCode        = "external_code"
+        case questionType = "question_type"
+        case difficultyLevel = "difficulty_level"
+        case basePoints = "base_points"
+        case correctOpenAnswer = "correct_open_answer"
+        case externalCode = "external_code"
     }
 }

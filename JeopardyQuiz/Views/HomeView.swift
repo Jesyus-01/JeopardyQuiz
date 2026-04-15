@@ -129,8 +129,9 @@ struct HomeView: View {
             .padding(.horizontal, 24)
         }
         // Passa il numero di giocatori selezionato alla schermata successiva
-        .onChange(of: gameViewModel.currentScreen) { screen in
-            if screen == .playerSetup, let count = selectedPlayerCount {
+        .onChange(of: gameViewModel.currentScreen) {
+            if gameViewModel.currentScreen == .playerSetup,
+               let count = selectedPlayerCount {
                 gameViewModel.preparePlayerSlots(count: count)
             }
         }

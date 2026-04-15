@@ -8,17 +8,17 @@
 import Foundation
 
 struct QuestionMedia: Codable, Identifiable {
-    let mediaId: Int
-    let questionId: Int
-    let mediaType: String    // "image" | "audio"
+    let mediaId: String             // ← String
+    let questionId: String          // ← String
+    let mediaType: String           // "AUDIO" | "IMAGE"
     let filename: String
-
-    var id: Int { mediaId }
-
+    
+    var id: String { mediaId }
+    
     enum CodingKeys: String, CodingKey {
-        case mediaId    = "media_id"
+        case mediaId = "media_id"
         case questionId = "question_id"
-        case mediaType  = "media_type"
+        case mediaType = "media_type"
         case filename
     }
 }
