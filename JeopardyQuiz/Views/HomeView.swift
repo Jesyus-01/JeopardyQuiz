@@ -5,10 +5,10 @@
 //  Created by Jesyus on 09/04/26.
 //
 
-
 import SwiftUI
 
 struct HomeView: View {
+
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var gameViewModel: GameViewModel
     @ObservedObject var downloadService = DownloadService.shared
@@ -70,12 +70,9 @@ struct HomeView: View {
                         Button("4 giocatori") { selectedPlayerCount = 4 }
                     } label: {
                         HStack {
-                            Text(selectedPlayerCount == nil
-                                 ? "Scegli..."
-                                 : "\(selectedPlayerCount!) giocatori")
+                            Text(selectedPlayerCount == nil ? "Scegli..." : "\(selectedPlayerCount!) giocatori")
                                 .font(.system(size: 15))
-                                .foregroundColor(selectedPlayerCount == nil
-                                                 ? theme.textMuted : theme.text)
+                                .foregroundColor(selectedPlayerCount == nil ? theme.textMuted : theme.text)
                             Spacer()
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 13))
@@ -91,9 +88,12 @@ struct HomeView: View {
                         )
                     }
 
-                    // Bottone Start
+                    // MARK: - Bottone Start (UNICO)
                     Button {
-                        gameViewModel.currentScreen = .playerSetup
+                        if let count = selectedPlayerCount {
+                            gameViewModel.preparePlayerSlots(count: count)
+                            gameViewModel.currentScreen = .playerSetup
+                        }
                     } label: {
                         Text("Start")
                             .font(.system(size: 17))
@@ -128,21 +128,12 @@ struct HomeView: View {
             }
             .padding(.horizontal, 24)
         }
-        // Passa il numero di giocatori selezionato alla schermata successiva
-        .onChange(of: gameViewModel.currentScreen) {
-            if gameViewModel.currentScreen == .playerSetup,
-               let count = selectedPlayerCount {
-                gameViewModel.preparePlayerSlots(count: count)
-            }
-        }
     }
 
     // MARK: - Sezione download
-
     @ViewBuilder
     private func downloadSection(theme: AppTheme) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-
             HStack {
                 Text("📦 Quiz offline")
                     .font(.system(size: 15, weight: .semibold))
@@ -155,28 +146,21 @@ struct HomeView: View {
                 }
             }
 
-            // Stato corrente
             statusView(theme: theme)
 
-            // Bottoni azione
             HStack(spacing: 12) {
-                // Scarica / Aggiorna
                 Button {
                     Task { await downloadService.startDownload() }
                 } label: {
                     HStack(spacing: 6) {
                         if isDownloading {
                             ProgressView()
-                                .progressViewStyle(
-                                    CircularProgressViewStyle(tint: theme.text)
-                                )
+                                .progressViewStyle(CircularProgressViewStyle(tint: theme.text))
                                 .scaleEffect(0.8)
                         } else {
-                            Image(systemName: downloadService.isReadyToPlay
-                                  ? "arrow.clockwise" : "arrow.down.circle")
+                            Image(systemName: downloadService.isReadyToPlay ? "arrow.clockwise" : "arrow.down.circle")
                         }
-                        Text(downloadService.isReadyToPlay
-                             ? "Aggiorna" : "Scarica quiz")
+                        Text(downloadService.isReadyToPlay ? "Aggiorna" : "Scarica quiz")
                             .font(.system(size: 14))
                     }
                     .foregroundColor(theme.text)
@@ -191,7 +175,6 @@ struct HomeView: View {
                 }
                 .disabled(isDownloading)
 
-                // Elimina dati (solo se scaricati)
                 if downloadService.isReadyToPlay {
                     Button {
                         showDeleteConfirm = true
@@ -227,7 +210,6 @@ struct HomeView: View {
     }
 
     // MARK: - Status view
-
     @ViewBuilder
     private func statusView(theme: AppTheme) -> some View {
         HStack(spacing: 8) {
@@ -242,15 +224,13 @@ struct HomeView: View {
     }
 
     // MARK: - Computed helpers
-
     private var canStart: Bool {
         selectedPlayerCount != nil && downloadService.isReadyToPlay
     }
 
     private var isDownloading: Bool {
         switch downloadService.state {
-        case .checkingServer, .checkingUpdates,
-             .downloading, .downloadingMedia:
+        case .checkingServer, .checkingUpdates, .downloading, .downloadingMedia:
             return true
         default:
             return false
@@ -259,10 +239,14 @@ struct HomeView: View {
 
     private var statusColor: Color {
         switch downloadService.state {
-        case .completed, .upToDate:    return .green
-        case .error:                   return .red
-        case .idle where downloadService.isReadyToPlay: return .green
-        default:                       return .orange
+        case .completed, .upToDate:
+            return .green
+        case .error:
+            return .red
+        case .idle where downloadService.isReadyToPlay:
+            return .green
+        default:
+            return .orange
         }
     }
 }

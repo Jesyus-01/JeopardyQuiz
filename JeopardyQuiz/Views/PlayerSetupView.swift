@@ -33,7 +33,7 @@ struct PlayerSetupView: View {
                         PlayerCardView(
                             player: $gameViewModel.players[index],
                             playerNumber: index + 1,
-                            availableAvatars: downloadService.localData?.avatars ?? [],
+                            availableAvatars: filteredAvatars,
                             usedAvatarIds: usedAvatarIds(excluding: index),
                             usedNames: usedNames(excluding: index),
                             theme: theme
@@ -71,12 +71,20 @@ struct PlayerSetupView: View {
         }
     }
 
+    // MARK: - Avatar filtrati (esclude avatar-default)
+
+    private var filteredAvatars: [Avatar] {
+        (downloadService.localData?.avatars ?? [])
+            .filter { $0.filename != "avatar-default.jpg" }
+            .sorted { $0.avatarId < $1.avatarId }
+    }
+
     // MARK: - Validazione
 
     private var canStart: Bool {
         let allHaveAvatar = gameViewModel.players.allSatisfy { $0.hasSelectedAvatar }
         let allHaveName   = gameViewModel.players.allSatisfy { $0.hasName }
-        let names  = gameViewModel.players.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
+        let names   = gameViewModel.players.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
         let avatars = gameViewModel.players.compactMap { $0.avatar?.avatarId }
         let uniqueNames   = Set(names).count == gameViewModel.players.count
         let uniqueAvatars = Set(avatars).count == gameViewModel.players.count
@@ -85,8 +93,7 @@ struct PlayerSetupView: View {
 
     private func usedAvatarIds(excluding index: Int) -> Set<String> {
         Set(
-            gameViewModel.players
-                .indices
+            gameViewModel.players.indices
                 .filter { $0 != index }
                 .compactMap { gameViewModel.players[$0].avatar?.avatarId }
         )
@@ -94,8 +101,7 @@ struct PlayerSetupView: View {
 
     private func usedNames(excluding index: Int) -> Set<String> {
         Set(
-            gameViewModel.players
-                .indices
+            gameViewModel.players.indices
                 .filter { $0 != index }
                 .map { gameViewModel.players[$0].name.trimmingCharacters(in: .whitespaces).lowercased() }
                 .filter { !$0.isEmpty }
@@ -113,7 +119,6 @@ struct PlayerCardView: View {
     let usedNames: Set<String>
     let theme: AppTheme
 
-    // Indice corrente nell'array avatar (0 = nessuno scelto)
     @State private var avatarIndex: Int = 0
 
     private var isDuplicateName: Bool {
@@ -127,23 +132,16 @@ struct PlayerCardView: View {
             // MARK: - Avatar carousel
             HStack(spacing: 16) {
 
-                // Freccia sinistra
-                Button {
-                    prevAvatar()
-                } label: {
+                Button { prevAvatar() } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(theme.textMuted)
                 }
 
-                // Avatar corrente
                 avatarView()
                     .frame(width: 100, height: 100)
 
-                // Freccia destra
-                Button {
-                    nextAvatar()
-                } label: {
+                Button { nextAvatar() } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(theme.textMuted)
@@ -190,15 +188,19 @@ struct PlayerCardView: View {
                 Circle()
                     .fill(theme.bgDark)
                     .overlay(Circle().stroke(theme.border, lineWidth: 2))
-                Image(systemName: "person.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(theme.textMuted)
+                Image("avatar-default")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 100, height: 100)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(theme.border, lineWidth: 2))
             }
         } else {
             let avatar = availableAvatars[avatarIndex - 1]
-            let localURL = LocalStorageService.shared.localMediaURLSync(for: avatar.filename)
-            // Carica immagine da file locale
-            if let uiImage = UIImage(contentsOfFile: localURL.path) {
+            // Legge da Assets.xcassets — "avatar1.jpg" → asset name "avatar1"
+            let assetName = String(avatar.filename.dropLast(4))
+
+            if let uiImage = UIImage(named: assetName) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
@@ -206,7 +208,7 @@ struct PlayerCardView: View {
                     .clipShape(Circle())
                     .overlay(Circle().stroke(theme.border, lineWidth: 2))
             } else {
-                // Fallback se file non trovato
+                // Fallback se asset non trovato
                 ZStack {
                     Circle()
                         .fill(theme.bgDark)

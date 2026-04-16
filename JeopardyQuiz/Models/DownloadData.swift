@@ -1,3 +1,10 @@
+//
+//  DownloadData.swift
+//  JeopardyQuiz
+//
+//  Created by Jesyus on 15/04/26.
+//
+
 import Foundation
 
 // MARK: - GET /api/download
@@ -8,6 +15,15 @@ struct DownloadResponse: Codable {
     let choiceOptions: [ChoiceOption]
     let questionMedia: [QuestionMedia]
     let avatars: [Avatar]
+
+    enum CodingKeys: String, CodingKey {
+        case version
+        case categories
+        case questions
+        case choiceOptions = "choiceOptions"   // camelCase nel JSON
+        case questionMedia = "questionMedia"   // camelCase nel JSON
+        case avatars
+    }
 }
 
 // MARK: - GET /api/download/version
