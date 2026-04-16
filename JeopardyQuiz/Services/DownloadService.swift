@@ -10,12 +10,12 @@ import Combine
 
 enum DownloadState: Equatable {
     case idle
-    case checkingServer          // ping /health
-    case checkingUpdates         // confronto versione
-    case downloading(progress: Double)  // 0.0 → 1.0
+    case checkingServer
+    case checkingUpdates
+    case downloading(progress: Double)
     case downloadingMedia(current: Int, total: Int)
     case completed
-    case upToDate                // già aggiornato, niente da fare
+    case upToDate
     case error(String)
 }
 
@@ -46,7 +46,6 @@ class DownloadService: ObservableObject {
     // MARK: - Flusso download completo
 
     func startDownload() async {
-        // Step 1: sveglia il server
         state = .checkingServer
         do {
             try await NetworkService.shared.wakeUpServer()
@@ -55,7 +54,6 @@ class DownloadService: ObservableObject {
             return
         }
 
-        // Step 2: controlla se c'è una versione più nuova
         state = .checkingUpdates
         do {
             let remoteVersion = try await NetworkService.shared.fetchVersion()
@@ -65,65 +63,19 @@ class DownloadService: ObservableObject {
             }
         } catch {
             // Se non riesce a controllare la versione procede comunque
-            // (potrebbe essere la prima volta)
         }
 
-        // Step 3: scarica tutti i dati JSON
         state = .downloading(progress: 0.0)
+
         let downloadData: DownloadResponse
         do {
             downloadData = try await NetworkService.shared.downloadAll()
-            state = .downloading(progress: 0.4)
+            state = .downloading(progress: 0.8)
         } catch {
             state = .error("Errore nel download dei dati: \(error.localizedDescription)")
             return
         }
 
-        // Step 4: scarica il manifest dei media
-        state = .downloading(progress: 0.5)
-        let manifest: MediaManifestResponse
-        do {
-            manifest = try await NetworkService.shared.fetchMediaManifest()
-            state = .downloading(progress: 0.6)
-        } catch {
-            state = .error("Errore nel manifest media: \(error.localizedDescription)")
-            return
-        }
-
-        // Step 5: scarica i file media (immagini + audio) da Cloudflare R2
-        let mediaFiles = manifest.files
-        let total = mediaFiles.count
-        var downloaded = 0
-
-        for mediaFile in mediaFiles {
-            // Salta se già scaricato
-            let alreadyExists = LocalStorageService.shared.isMediaDownloaded(
-                filename: mediaFile.filename
-            )
-            if alreadyExists {
-                downloaded += 1
-                state = .downloadingMedia(current: downloaded, total: total)
-                continue
-            }
-
-            // Scarica da R2
-            guard let url = URL(string: mediaFile.url) else { continue }
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                try LocalStorageService.shared.saveMedia(
-                    data: data,
-                    filename: mediaFile.filename
-                )
-            } catch {
-                // File non critico: logga e continua
-                print("⚠️ Media non scaricato: \(mediaFile.filename) — \(error)")
-            }
-
-            downloaded += 1
-            state = .downloadingMedia(current: downloaded, total: total)
-        }
-
-        // Step 6: salva JSON e versione su disco
         do {
             try LocalStorageService.shared.saveDownloadData(downloadData)
             try LocalStorageService.shared.saveVersion(
@@ -134,7 +86,6 @@ class DownloadService: ObservableObject {
             return
         }
 
-        // Step 7: aggiorna stato in memoria
         await loadLocalData()
         state = .completed
     }
@@ -154,12 +105,10 @@ class DownloadService: ObservableObject {
 
     // MARK: - Helpers UI
 
-    /// true se ci sono dati scaricati e pronti per giocare
     var isReadyToPlay: Bool {
         localData != nil
     }
 
-    /// Testo descrittivo dello stato corrente per la UI
     var statusMessage: String {
         switch state {
         case .idle:

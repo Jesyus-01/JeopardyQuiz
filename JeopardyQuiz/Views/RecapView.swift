@@ -222,13 +222,15 @@ struct RecapView: View {
         .padding(.vertical, 16)
     }
 
+
     // MARK: - Avatar helper
 
     @ViewBuilder
     private func avatarCircle(player: Player, size: CGFloat) -> some View {
         if let avatar = player.avatar {
-            let url = LocalStorageService.shared.localMediaURLSync(for: avatar.filename)
-            if let img = UIImage(contentsOfFile: url.path) {
+            // ✅ Avatar da Assets.xcassets con UIImage(named:)
+            let assetName = (avatar.filename as NSString).deletingPathExtension
+            if let img = UIImage(named: assetName) ?? UIImage(named: avatar.filename) {
                 Image(uiImage: img)
                     .resizable()
                     .scaledToFill()

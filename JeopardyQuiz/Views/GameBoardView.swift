@@ -186,8 +186,8 @@ struct PlayerPillView: View {
     @ViewBuilder
     private func avatarImage() -> some View {
         if let avatar = player.avatar {
-            let url = LocalStorageService.shared.localMediaURLSync(for: avatar.filename)
-            if let uiImage = UIImage(contentsOfFile: url.path) {
+            let assetName = (avatar.filename as NSString).deletingPathExtension
+            if let uiImage = UIImage(named: assetName) ?? UIImage(named: avatar.filename) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()

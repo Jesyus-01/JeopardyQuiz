@@ -34,7 +34,7 @@ final class LocalStorageService {
         jeopardyDir.appendingPathComponent("version.txt")
     }
 
-    /// Cartella media: Documents/jeopardy/media/
+    /// Cartella media legacy: Documents/jeopardy/media/
     private var mediaDir: URL {
         jeopardyDir.appendingPathComponent("media", isDirectory: true)
     }
@@ -48,34 +48,29 @@ final class LocalStorageService {
 
     // MARK: - Dati JSON
 
-    /// Salva la risposta completa di /api/download su disco
     func saveDownloadData(_ data: DownloadResponse) throws {
         try createDirectoriesIfNeeded()
         let encoded = try JSONEncoder().encode(data)
         try encoded.write(to: dataFileURL, options: .atomic)
     }
 
-    /// Legge i dati salvati dal disco (nil se non esistono)
     func loadDownloadData() throws -> DownloadResponse? {
         guard fileManager.fileExists(atPath: dataFileURL.path) else { return nil }
         let data = try Data(contentsOf: dataFileURL)
         return try JSONDecoder().decode(DownloadResponse.self, from: data)
     }
 
-    /// Controlla se esistono dati scaricati
     var hasLocalData: Bool {
         fileManager.fileExists(atPath: dataFileURL.path)
     }
 
     // MARK: - Versione
 
-    /// Salva il timestamp versione DB
     func saveVersion(_ version: Int) throws {
         try createDirectoriesIfNeeded()
         try String(version).write(to: versionFileURL, atomically: true, encoding: .utf8)
     }
 
-    /// Legge il timestamp versione salvato localmente (nil se non esiste)
     func loadVersion() -> Int? {
         guard fileManager.fileExists(atPath: versionFileURL.path),
               let str = try? String(contentsOf: versionFileURL, encoding: .utf8),
@@ -84,33 +79,80 @@ final class LocalStorageService {
         return version
     }
 
-    // MARK: - Media
+    // MARK: - Media legacy su disco
 
-    /// Percorso locale di un file media dato il filename
     func localMediaURL(for filename: String) -> URL {
         mediaDir.appendingPathComponent(filename)
     }
 
-    /// Controlla se un file media è già scaricato
     func isMediaDownloaded(filename: String) -> Bool {
         fileManager.fileExists(atPath: localMediaURL(for: filename).path)
     }
 
-    /// Salva un file media su disco
     func saveMedia(data: Data, filename: String) throws {
         try createDirectoriesIfNeeded()
         let dest = localMediaURL(for: filename)
         try data.write(to: dest, options: .atomic)
     }
 
-    /// Elimina tutti i dati (JSON + media + versione)
+    // MARK: - Bundle media (folder reference blu)
+
+    private func bundledMediaURL(for filename: String, subdirectory: String) -> URL? {
+        let nsFilename = filename as NSString
+        let nameWithoutExt = nsFilename.deletingPathExtension
+        let ext = nsFilename.pathExtension
+
+        return Bundle.main.url(
+            forResource: nameWithoutExt,
+            withExtension: ext.isEmpty ? nil : ext,
+            subdirectory: subdirectory
+        )
+    }
+
+    /// Cerca il file prima nel Bundle (cartella blu), poi come fallback in Documents.
+    func resolveMediaURL(for filename: String, subdirectories: [String]) -> URL? {
+        let nsFilename = filename as NSString
+        let nameWithoutExt = nsFilename.deletingPathExtension
+        let ext = nsFilename.pathExtension
+
+        // 1. Cerca nella root del bundle (Xcode appiattisce le folder reference)
+        if let bundled = Bundle.main.url(
+            forResource: nameWithoutExt,
+            withExtension: ext.isEmpty ? nil : ext
+        ) {
+            return bundled
+        }
+
+        // 2. Cerca nelle sottocartelle (fallback per strutture diverse)
+        for subdirectory in subdirectories {
+            if let bundled = Bundle.main.url(
+                forResource: nameWithoutExt,
+                withExtension: ext.isEmpty ? nil : ext,
+                subdirectory: subdirectory
+            ) {
+                return bundled
+            }
+        }
+
+        // 3. Fallback: Documents/jeopardy/media/
+        let localURL = localMediaURL(for: filename)
+        if fileManager.fileExists(atPath: localURL.path) {
+            return localURL
+        }
+
+        return nil
+    }
+
+    // MARK: - Pulizia
+
     func deleteAll() throws {
         if fileManager.fileExists(atPath: jeopardyDir.path) {
             try fileManager.removeItem(at: jeopardyDir)
         }
     }
 
-    /// Dimensione totale dei dati scaricati (in bytes)
+    // MARK: - Storage info
+
     func totalStorageUsed() -> Int64 {
         guard fileManager.fileExists(atPath: jeopardyDir.path) else { return 0 }
         guard let enumerator = fileManager.enumerator(
@@ -127,20 +169,9 @@ final class LocalStorageService {
         return total
     }
 
-    /// Formatta la dimensione in MB leggibile
     func formattedStorageSize() -> String {
         let bytes = totalStorageUsed()
         let mb = Double(bytes) / 1_048_576
         return String(format: "%.1f MB", mb)
-    }
-    
-    // Aggiungere in LocalStorageService — versione sincrona per le View
-    nonisolated func localMediaURLSync(for filename: String) -> URL {
-        let docs = FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return docs
-            .appendingPathComponent("jeopardy")
-            .appendingPathComponent("media")
-            .appendingPathComponent(filename)
     }
 }

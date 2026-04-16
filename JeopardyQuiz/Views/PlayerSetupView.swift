@@ -82,12 +82,12 @@ struct PlayerSetupView: View {
     // MARK: - Validazione
 
     private var canStart: Bool {
-        let allHaveAvatar = gameViewModel.players.allSatisfy { $0.hasSelectedAvatar }
-        let allHaveName   = gameViewModel.players.allSatisfy { $0.hasName }
-        let names   = gameViewModel.players.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
-        let avatars = gameViewModel.players.compactMap { $0.avatar?.avatarId }
-        let uniqueNames   = Set(names).count == gameViewModel.players.count
-        let uniqueAvatars = Set(avatars).count == gameViewModel.players.count
+        let allHaveAvatar  = gameViewModel.players.allSatisfy { $0.hasSelectedAvatar }
+        let allHaveName    = gameViewModel.players.allSatisfy { $0.hasName }
+        let names          = gameViewModel.players.map { $0.name.trimmingCharacters(in: .whitespaces).lowercased() }
+        let avatars        = gameViewModel.players.compactMap { $0.avatar?.avatarId }
+        let uniqueNames    = Set(names).count == gameViewModel.players.count
+        let uniqueAvatars  = Set(avatars).count == gameViewModel.players.count
         return allHaveAvatar && allHaveName && uniqueNames && uniqueAvatars
     }
 
@@ -131,7 +131,6 @@ struct PlayerCardView: View {
 
             // MARK: - Avatar carousel
             HStack(spacing: 16) {
-
                 Button { prevAvatar() } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .semibold))
@@ -184,24 +183,22 @@ struct PlayerCardView: View {
     private func avatarView() -> some View {
         if avatarIndex == 0 {
             // Nessun avatar scelto — placeholder
-            ZStack {
-                Circle()
-                    .fill(theme.bgDark)
-                    .overlay(Circle().stroke(theme.border, lineWidth: 2))
-                Image("avatar-default")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 100, height: 100)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(theme.border, lineWidth: 2))
-            }
+            Image("avatar-default")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 100, height: 100)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(theme.border, lineWidth: 2))
         } else {
             let avatar = availableAvatars[avatarIndex - 1]
-            // Legge da Assets.xcassets — "avatar1.jpg" → asset name "avatar1"
-            let assetName = String(avatar.filename.dropLast(4))
+            // ✅ CORRETTO: usa NSString per rimuovere l'estensione in modo sicuro
+            // Prova prima con il filename completo, poi senza estensione
+            let assetNameFull    = avatar.filename
+            let assetNameNoExt   = (avatar.filename as NSString).deletingPathExtension
+            let uiImage          = UIImage(named: assetNameNoExt) ?? UIImage(named: assetNameFull)
 
-            if let uiImage = UIImage(named: assetName) {
-                Image(uiImage: uiImage)
+            if let img = uiImage {
+                Image(uiImage: img)
                     .resizable()
                     .scaledToFill()
                     .frame(width: 100, height: 100)
@@ -217,6 +214,7 @@ struct PlayerCardView: View {
                         .font(.system(size: 40))
                         .foregroundColor(theme.textMuted)
                 }
+                .frame(width: 100, height: 100)
             }
         }
     }
@@ -229,7 +227,7 @@ struct PlayerCardView: View {
         repeat {
             next = (next % availableAvatars.count) + 1
         } while usedAvatarIds.contains(availableAvatars[next - 1].avatarId) && next != avatarIndex
-        avatarIndex = next
+        avatarIndex   = next
         player.avatar = availableAvatars[avatarIndex - 1]
     }
 
@@ -239,7 +237,7 @@ struct PlayerCardView: View {
         repeat {
             prev = prev <= 1 ? availableAvatars.count : prev - 1
         } while usedAvatarIds.contains(availableAvatars[prev - 1].avatarId) && prev != avatarIndex
-        avatarIndex = prev
+        avatarIndex   = prev
         player.avatar = availableAvatars[avatarIndex - 1]
     }
 }
