@@ -15,6 +15,8 @@ struct QuestionModalView: View {
     @EnvironmentObject var gameViewModel: GameViewModel
     let cell: BoardCell
 
+    @State private var showImageViewer: Bool = false
+    @State private var zoomedImage: UIImage? = nil
     @State private var audioPlayer: AVAudioPlayer? = nil
     @State private var isPlaying: Bool = false
     @State private var mediaURL: URL? = nil
@@ -54,9 +56,16 @@ struct QuestionModalView: View {
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(jeopardyGold.opacity(0.35), lineWidth: 1.5)
             )
-            .frame(maxWidth: 680)
-            .padding(.horizontal, 40)
+            .frame(maxWidth: 860, maxHeight: UIScreen.main.bounds.height * 0.90)
+            .padding(.horizontal, 24)
             .shadow(color: .black.opacity(0.4), radius: 32, y: 12)
+        }
+        .overlay {
+            if showImageViewer, let img = zoomedImage {
+                ImageViewerOverlay(image: img, isPresented: $showImageViewer)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+            }
         }
         .task {
             if let media = gameViewModel.media(for: cell.question) {
@@ -171,6 +180,26 @@ struct QuestionModalView: View {
                         .scaledToFit()
                         .frame(maxHeight: 300)
                         .cornerRadius(12)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                        .overlay(alignment: .bottomTrailing) {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(6)
+                                .background(Color.black.opacity(0.5))
+                                .clipShape(Circle())
+                                .padding(8)
+                        }
+                        .onTapGesture {
+                            zoomedImage = uiImage
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showImageViewer = true
+                            }
+                        }
+                        .contentShape(Rectangle())
                 } else if mediaURL == nil {
                     RoundedRectangle(cornerRadius: 12)
                         .fill(theme.bgDark)
@@ -463,3 +492,107 @@ struct QuestionModalView: View {
     }
 }
 
+
+// MARK: - Image Viewer Overlay (tap to dismiss, pinch to zoom)
+struct ImageViewerOverlay: View {
+    let image: UIImage
+    @Binding var isPresented: Bool
+
+    @State private var scale:      CGFloat = 1.0
+    @State private var lastScale:  CGFloat = 1.0
+    @State private var offset:     CGSize  = .zero
+    @State private var lastOffset: CGSize  = .zero
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.92)
+                .ignoresSafeArea()
+                .onTapGesture { dismiss() }
+
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFit()
+                .scaleEffect(scale)
+                .offset(offset)
+                .gesture(
+                    MagnificationGesture()
+                        .onChanged { value in
+                            scale = max(1.0, min(lastScale * value, 5.0))
+                        }
+                        .onEnded { _ in
+                            lastScale = scale
+                            if scale <= 1.05 {
+                                withAnimation(.spring(response: 0.3)) {
+                                    scale  = 1.0
+                                    offset = .zero
+                                }
+                                lastScale  = 1.0
+                                lastOffset = .zero
+                            }
+                        }
+                )
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            guard scale > 1.0 else { return }
+                            offset = CGSize(
+                                width:  lastOffset.width  + value.translation.width,
+                                height: lastOffset.height + value.translation.height
+                            )
+                        }
+                        .onEnded { _ in lastOffset = offset }
+                )
+                .simultaneousGesture(
+                    TapGesture(count: 2).onEnded {
+                        withAnimation(.spring(response: 0.3)) {
+                            if scale > 1.0 {
+                                scale  = 1.0
+                                offset = .zero
+                                lastScale  = 1.0
+                                lastOffset = .zero
+                            } else {
+                                scale     = 2.5
+                                lastScale = 2.5
+                            }
+                        }
+                    }
+                )
+                .padding(24)
+
+            // Bottone chiudi
+            VStack {
+                HStack {
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(20)
+                }
+                Spacer()
+
+                // Hint
+                if scale <= 1.0 {
+                    Text("Pizzica per zoomare · Doppio tap · Tocca per chiudere")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.5))
+                        .padding(.bottom, 24)
+                        .transition(.opacity)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: scale)
+    }
+
+    private func dismiss() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isPresented = false
+        }
+    }
+}
