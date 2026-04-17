@@ -8,45 +8,54 @@ class GameViewModel: ObservableObject {
     @Published var currentScreen: AppScreen = .home
 
     // MARK: - Giocatori
-    @Published var players: [Player] = []
-    @Published var activePlayerIndex: Int = 0
+    @Published var players:           [Player] = []
+    @Published var activePlayerIndex: Int      = 0
 
     // MARK: - Tabellone
-    @Published var board: [[BoardCell]] = []   // [colonna(categoria)][riga(difficulty)]
-    @Published var totalQuestions: Int = 0
-    @Published var playedQuestions: Int = 0
+    @Published var board:           [[BoardCell]] = []
+    @Published var totalQuestions:  Int           = 0
+    @Published var playedQuestions: Int           = 0
 
     // MARK: - Modal domanda
-    @Published var selectedCell: BoardCell? = nil
-    @Published var showQuestionModal: Bool = false
-    @Published var answerVisible: Bool = false
-    @Published var selectedOptionId: String? = nil
+    @Published var selectedCell:    BoardCell? = nil
+    @Published var showQuestionModal: Bool     = false
+    @Published var answerVisible:   Bool       = false
+    @Published var selectedOptionId: String?   = nil
 
     // MARK: - Fine partita
     @Published var isGameOver: Bool = false
 
-    // MARK: - Riferimento ai dati locali
-    private var allCategories: [Category] = []
-    private var allOptions: [ChoiceOption] = []
-    private var allMedia: [QuestionMedia] = []
+    // MARK: - Dati locali
+    private var allCategories: [Category]      = []
+    private var allOptions:    [ChoiceOption]  = []
+    private var allMedia:      [QuestionMedia] = []
 
-    // MARK: - Setup partita
-
+    // MARK: - Setup partita (genera board al volo)
     func setupGame(players: [Player], data: DownloadResponse) {
         self.players       = players
         self.allCategories = data.categories
         self.allOptions    = data.choiceOptions
         self.allMedia      = data.questionMedia
-
         buildBoard(data: data)
-        activePlayerIndex = 0
-        playedQuestions   = 0
-        isGameOver        = false
-        currentScreen     = .board
+        resetCounters()
     }
 
-    // MARK: - Costruzione tabellone
+    // MARK: - Setup partita da quiz pre-generato
+    func setupGame(players: [Player], quiz: SavedQuiz, data: DownloadResponse) {
+        self.players       = players
+        self.allCategories = data.categories
+        self.allOptions    = data.choiceOptions
+        self.allMedia      = data.questionMedia
 
+        let loadedBoard   = GeneratedQuizStore.shared.toBoard(quiz)
+        board             = loadedBoard
+        let allQ          = loadedBoard.flatMap { $0 }.count
+        let n             = players.count
+        totalQuestions    = (allQ / n) * n   // giri interi: scarta il resto
+        resetCounters()
+    }
+
+    // MARK: - Costruzione tabellone casuale
     private func buildBoard(data: DownloadResponse) {
         guard let generated = QuizGeneratorService.shared.generateBoard(
             from: data,
@@ -55,23 +64,29 @@ class GameViewModel: ObservableObject {
             currentScreen = .home
             return
         }
+        board             = generated.cells
+        let allQ          = generated.totalQuestions
+        let n             = players.count
+        totalQuestions    = (allQ / n) * n   // giri interi: scarta il resto
+    }
 
-        board          = generated.cells
-        totalQuestions = generated.totalQuestions
+    private func resetCounters() {
+        activePlayerIndex = 0
+        playedQuestions   = 0
+        isGameOver        = false
+        currentScreen     = .board
     }
 
     // MARK: - Selezione cella
-
     func selectCell(_ cell: BoardCell) {
         guard !cell.isPlayed else { return }
-        selectedCell      = cell
-        answerVisible     = false
-        selectedOptionId  = nil
+        selectedCell     = cell
+        answerVisible    = false
+        selectedOptionId = nil
         showQuestionModal = true
     }
 
     // MARK: - Azioni modal
-
     func markCorrect() {
         guard let cell = selectedCell else { return }
         players[activePlayerIndex].score          += cell.points
@@ -81,7 +96,7 @@ class GameViewModel: ObservableObject {
 
     func markWrong() {
         guard let cell = selectedCell else { return }
-        players[activePlayerIndex].score        -= cell.points
+        players[activePlayerIndex].score       -= cell.points
         players[activePlayerIndex].wrongAnswers += 1
         closeModal(cell: cell)
     }
@@ -96,17 +111,14 @@ class GameViewModel: ObservableObject {
         playedQuestions += 1
         showQuestionModal = false
         selectedCell      = nil
-
         if playedQuestions >= totalQuestions {
             endGame()
             return
         }
-
         activePlayerIndex = (activePlayerIndex + 1) % players.count
     }
 
     // MARK: - Helpers tabellone
-
     private func markCellPlayed(_ cell: BoardCell) {
         for col in board.indices {
             for row in board[col].indices {
@@ -132,43 +144,32 @@ class GameViewModel: ObservableObject {
         allCategories.first(where: { $0.categoryId == question.categoryId })
     }
 
-    /// Risolve il file media nel bundle in base a tipo domanda + categoria.
     func localMediaURL(for question: Question) async -> URL? {
         guard let media = media(for: question) else {
             print("❌ Nessun media trovato per question_id: \(question.questionId)")
             return nil
         }
-        
         let subdirectories = bundledSubdirectories(for: question, media: media)
         print("🔍 Cerco '\(media.filename)' in: \(subdirectories)")
-        
         let result = LocalStorageService.shared.resolveMediaURL(
             for: media.filename,
             subdirectories: subdirectories
         )
-        
         print(result != nil ? "✅ Trovato: \(result!.path)" : "❌ Non trovato: \(media.filename)")
         return result
     }
 
     private func bundledSubdirectories(for question: Question, media: QuestionMedia) -> [String] {
         let normalizedMediaType = media.mediaType.uppercased()
-
-        // Audio → solo opening
         if question.questionType == .audio || normalizedMediaType == "AUDIO" {
             return ["opening"]
         }
-
-        // Immagini → cerca in entrambe (nomi ora univoci grazie al prefisso a- / p-)
         return ["ambientazione", "personaggio"]
     }
 
     // MARK: - Fine partita
-
     private func endGame() {
-        let sorted = players.indices.sorted {
-            players[$0].score > players[$1].score
-        }
+        let sorted = players.indices.sorted { players[$0].score > players[$1].score }
         for (rank, playerIndex) in sorted.enumerated() {
             players[playerIndex].rank = rank + 1
         }
@@ -176,16 +177,11 @@ class GameViewModel: ObservableObject {
         currentScreen = .recap
     }
 
-    var winner: Player? {
-        players.first(where: { $0.rank == 1 })
-    }
+    var winner: Player? { players.first(where: { $0.rank == 1 }) }
 
-    var rankedPlayers: [Player] {
-        players.sorted { $0.rank < $1.rank }
-    }
+    var rankedPlayers: [Player] { players.sorted { $0.rank < $1.rank } }
 
-    // MARK: - Nuova partita
-
+    // MARK: - Reset
     func resetGame() {
         players           = []
         board             = []
@@ -199,8 +195,6 @@ class GameViewModel: ObservableObject {
     }
 
     func preparePlayerSlots(count: Int) {
-        players = (1...count).map { i in
-            Player(name: "Giocatore \(i)")
-        }
+        players = (1...count).map { i in Player(name: "Giocatore \(i)") }
     }
 }
