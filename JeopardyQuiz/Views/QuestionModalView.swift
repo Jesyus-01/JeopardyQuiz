@@ -1,9 +1,11 @@
-//
-//  QuestionModalView.swift
-//  JeopardyQuiz
-//
-//  Created by Jesyus on 15/04/26.
-//
+// QuestionModalView.swift — UI rewrite
+// Miglioramenti:
+//   1. Sfondo modale con identità visiva Jeopardy (bordo oro, header colorato)
+//   2. Header: categoria in oro uppercase, punti grandi e bold
+//   3. Risposte multiple: tap state animato, layout più leggibile
+//   4. Bottoni Sbagliato/Corretto: più incisivi, fill solido con icona
+//   5. "Mostra risposta": stile neutro ma visibile
+//   6. Audio player: stile coerente con il resto
 
 import SwiftUI
 import AVFoundation
@@ -11,7 +13,6 @@ import AVFoundation
 struct QuestionModalView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var gameViewModel: GameViewModel
-
     let cell: BoardCell
 
     @State private var audioPlayer: AVAudioPlayer? = nil
@@ -21,63 +22,20 @@ struct QuestionModalView: View {
     @State private var duration: Double = 1
     @State private var timer: Timer? = nil
 
+    // Oro Jeopardy — usato per accent nella modale
+    private let jeopardyGold = Color(red: 0.961, green: 0.773, blue: 0.094)
+
     var body: some View {
         let theme = AppTheme(themeManager.scheme)
 
         ZStack {
             Color.black.opacity(0.6)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    gameViewModel.closeWithoutScore()
-                }
+                .onTapGesture { gameViewModel.closeWithoutScore() }
 
             VStack(spacing: 0) {
-
-                // MARK: - Header
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(cell.categoryName)
-                            .font(.system(size: 13))
-                            .foregroundColor(theme.textMuted)
-                        Text("\(cell.points) punti")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(theme.text)
-                    }
-                    Spacer()
-
-                    if let player = gameViewModel.players[safe: gameViewModel.activePlayerIndex] {
-                        HStack(spacing: 8) {
-                            if let avatar = player.avatar {
-                                let assetName = (avatar.filename as NSString).deletingPathExtension
-                                if let img = UIImage(named: assetName) ?? UIImage(named: avatar.filename) {
-                                    Image(uiImage: img)
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(width: 32, height: 32)
-                                        .clipShape(Circle())
-                                }
-                            }
-                            Text(player.name)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(theme.text)
-                        }
-                    }
-
-                    Button {
-                        stopAudio()
-                        gameViewModel.closeWithoutScore()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16))
-                            .foregroundColor(theme.textMuted)
-                            .padding(8)
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-                .padding(.bottom, 16)
-
-                Divider().background(theme.border)
+                headerView(theme: theme)
+                Divider().background(jeopardyGold.opacity(0.3))
 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -87,7 +45,6 @@ struct QuestionModalView: View {
                 }
 
                 Divider().background(theme.border)
-
                 footerActions(theme: theme)
                     .padding(24)
             }
@@ -95,16 +52,15 @@ struct QuestionModalView: View {
             .cornerRadius(20)
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(theme.border, lineWidth: 1)
+                    .stroke(jeopardyGold.opacity(0.35), lineWidth: 1.5)
             )
             .frame(maxWidth: 680)
             .padding(.horizontal, 40)
-            .shadow(color: .black.opacity(0.3), radius: 24, y: 8)
+            .shadow(color: .black.opacity(0.4), radius: 32, y: 12)
         }
         .task {
             if let media = gameViewModel.media(for: cell.question) {
                 mediaURL = await gameViewModel.localMediaURL(for: cell.question)
-                // Pre-carica il player per avere la duration subito
                 if let url = mediaURL, media.mediaType == "AUDIO" {
                     audioPlayer = try? AVAudioPlayer(contentsOf: url)
                     audioPlayer?.prepareToPlay()
@@ -112,45 +68,84 @@ struct QuestionModalView: View {
                 }
             }
         }
-        .onDisappear {
-            stopAudio()
+        .onDisappear { stopAudio() }
+    }
+
+    // MARK: - Header
+    private func headerView(theme: AppTheme) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(cell.categoryName.uppercased())
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundColor(jeopardyGold)
+
+                Text("\(cell.points) punti")
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(theme.text)
+            }
+
+            Spacer()
+
+            // Avatar + nome giocatore attivo
+            if !gameViewModel.players.isEmpty {
+                let player = gameViewModel.players[gameViewModel.activePlayerIndex]
+                HStack(spacing: 8) {
+                    if let avatar = player.avatar {
+                        let assetName = (avatar.filename as NSString).deletingPathExtension
+                        if let img = UIImage(named: assetName) ?? UIImage(named: avatar.filename) {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 34, height: 34)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(jeopardyGold.opacity(0.6), lineWidth: 1.5))
+                        }
+                    }
+                    Text(player.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(theme.text)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(jeopardyGold.opacity(0.08))
+                .cornerRadius(20)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(jeopardyGold.opacity(0.25), lineWidth: 1)
+                )
+            }
+
+            Button {
+                stopAudio()
+                gameViewModel.closeWithoutScore()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(theme.textMuted)
+                    .frame(width: 32, height: 32)
+                    .background(theme.bgDark)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(theme.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, 24)
+        .padding(.top, 24)
+        .padding(.bottom, 16)
     }
 
     // MARK: - Corpo domanda
-
     @ViewBuilder
     private func questionBody(theme: AppTheme) -> some View {
         let media = gameViewModel.media(for: cell.question)
 
         switch cell.question.questionType {
-
         case .open, .image:
             VStack(spacing: 20) {
-                if let media = media, media.mediaType == "IMAGE",
-                   let url = mediaURL,
-                   let uiImage = UIImage(contentsOfFile: url.path) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 300)
-                        .cornerRadius(12)
-                } else if let media = media, media.mediaType == "IMAGE", mediaURL == nil {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(theme.bgDark)
-                        .frame(height: 200)
-                        .overlay(ProgressView())
-                }
+                mediaContent(media: media, theme: theme)
 
-                if let media = media, media.mediaType == "AUDIO" {
-                    audioPlayerView(theme: theme)
-                }
-
-                Text(cell.question.text)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundColor(theme.text)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                questionText(theme: theme)
 
                 if gameViewModel.answerVisible {
                     answerCard(text: cell.question.correctOpenAnswer ?? "—", theme: theme)
@@ -159,42 +154,51 @@ struct QuestionModalView: View {
 
         case .multipleChoice, .audio:
             VStack(spacing: 20) {
-                if let media = media, media.mediaType == "IMAGE",
-                   let url = mediaURL,
-                   let uiImage = UIImage(contentsOfFile: url.path) {
-                    Image(uiImage: uiImage)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 200)
-                        .cornerRadius(12)
-                } else if let media = media, media.mediaType == "IMAGE", mediaURL == nil {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(theme.bgDark)
-                        .frame(height: 200)
-                        .overlay(ProgressView())
-                }
-
-                if let media = media, media.mediaType == "AUDIO" {
-                    audioPlayerView(theme: theme)
-                }
-
+                mediaContent(media: media, theme: theme)
                 multipleChoiceContent(theme: theme)
             }
         }
     }
 
-    // MARK: - Multiple Choice content
+    // MARK: - Media (immagine o audio)
+    @ViewBuilder
+    private func mediaContent(media: QuestionMedia?, theme: AppTheme) -> some View {
+        if let media = media {
+            if media.mediaType == "IMAGE" {
+                if let url = mediaURL, let uiImage = UIImage(contentsOfFile: url.path) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 300)
+                        .cornerRadius(12)
+                } else if mediaURL == nil {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(theme.bgDark)
+                        .frame(height: 200)
+                        .overlay(ProgressView())
+                }
+            } else if media.mediaType == "AUDIO" {
+                audioPlayerView(theme: theme)
+            }
+        }
+    }
 
+    // MARK: - Testo domanda
+    private func questionText(theme: AppTheme) -> some View {
+        Text(cell.question.text)
+            .font(.system(size: 22, weight: .medium))
+            .foregroundColor(theme.text)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: - Multiple choice
     @ViewBuilder
     private func multipleChoiceContent(theme: AppTheme) -> some View {
         let options = gameViewModel.options(for: cell.question)
 
         VStack(spacing: 20) {
-            Text(cell.question.text)
-                .font(.system(size: 22, weight: .medium))
-                .foregroundColor(theme.text)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            questionText(theme: theme)
 
             LazyVGrid(
                 columns: [GridItem(.flexible()), GridItem(.flexible())],
@@ -207,43 +211,32 @@ struct QuestionModalView: View {
         }
     }
 
-    // MARK: - Audio player view
-
+    // MARK: - Audio player
     @ViewBuilder
     private func audioPlayerView(theme: AppTheme) -> some View {
         VStack(spacing: 16) {
-
-            // Icona nota musicale animata
             Image(systemName: isPlaying ? "music.note.list" : "music.note")
                 .font(.system(size: 36))
-                .foregroundColor(theme.textMuted)
+                .foregroundColor(jeopardyGold)
                 .animation(.easeInOut(duration: 0.2), value: isPlaying)
 
-            // Bottone play/pausa
-            Button {
-                toggleAudio()
-            } label: {
+            Button { toggleAudio() } label: {
                 Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
                     .font(.system(size: 56))
-                    .foregroundColor(theme.text)
+                    .foregroundColor(jeopardyGold)
             }
             .buttonStyle(.plain)
 
-            // Timeline
             VStack(spacing: 6) {
-                // Slider
                 Slider(
                     value: $currentTime,
                     in: 0...max(duration, 1),
                     onEditingChanged: { editing in
-                        if !editing {
-                            audioPlayer?.currentTime = currentTime
-                        }
+                        if !editing { audioPlayer?.currentTime = currentTime }
                     }
                 )
-                .tint(theme.primary)
+                .tint(jeopardyGold)
 
-                // Tempi
                 HStack {
                     Text(formatTime(currentTime))
                         .font(.system(size: 12, design: .monospaced))
@@ -259,34 +252,32 @@ struct QuestionModalView: View {
         .frame(maxWidth: .infinity)
         .background(theme.bgDark)
         .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(jeopardyGold.opacity(0.2), lineWidth: 1)
+        )
     }
 
     // MARK: - Option button
-
     @ViewBuilder
     private func optionButton(option: ChoiceOption, theme: AppTheme) -> some View {
-        let isSelected = gameViewModel.selectedOptionId == option.optionId
-        let showResult = gameViewModel.answerVisible
-        let isCorrect  = option.isCorrect
+        let isSelected  = gameViewModel.selectedOptionId == option.optionId
+        let showResult  = gameViewModel.answerVisible
+        let isCorrect   = option.isCorrect
 
         let bgColor: Color = {
             if showResult {
-                if isCorrect { return Color.green.opacity(0.2) }
-                if isSelected && !isCorrect { return Color.red.opacity(0.2) }
-            } else if isSelected {
-                return theme.primary.opacity(0.15)
+                return isCorrect ? Color.green.opacity(0.15) :
+                       (isSelected ? Color.red.opacity(0.15) : theme.bgDark)
             }
-            return theme.bgDark
+            return isSelected ? jeopardyGold.opacity(0.12) : theme.bgDark
         }()
 
         let borderColor: Color = {
             if showResult {
-                if isCorrect { return .green }
-                if isSelected && !isCorrect { return .red }
-            } else if isSelected {
-                return theme.primary
+                return isCorrect ? .green : (isSelected ? .red : theme.border)
             }
-            return theme.border
+            return isSelected ? jeopardyGold : theme.border
         }()
 
         Button {
@@ -295,9 +286,12 @@ struct QuestionModalView: View {
         } label: {
             HStack(spacing: 12) {
                 Text(optionLabel(order: option.optionOrder))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(theme.textMuted)
-                    .frame(width: 24)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(isSelected ? jeopardyGold : theme.textMuted)
+                    .frame(width: 24, height: 24)
+                    .background(isSelected ? jeopardyGold.opacity(0.15) : theme.bgDark.opacity(0))
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(isSelected ? jeopardyGold.opacity(0.5) : theme.border, lineWidth: 1))
 
                 Text(option.optionText)
                     .font(.system(size: 15))
@@ -308,33 +302,32 @@ struct QuestionModalView: View {
                 Spacer()
 
                 if showResult && isCorrect {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                }
-                if showResult && isSelected && !isCorrect {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.red)
+                    Image(systemName: "checkmark.circle.fill").foregroundColor(.green)
+                } else if showResult && isSelected && !isCorrect {
+                    Image(systemName: "xmark.circle.fill").foregroundColor(.red)
                 }
             }
             .padding(14)
+            .frame(maxWidth: .infinity)
             .background(bgColor)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(borderColor, lineWidth: 1)
+                    .stroke(borderColor, lineWidth: isSelected ? 1.5 : 1)
             )
         }
         .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.15), value: gameViewModel.answerVisible)
+        .animation(.easeInOut(duration: 0.12), value: isSelected)
     }
 
     // MARK: - Answer card
-
     @ViewBuilder
     private func answerCard(text: String, theme: AppTheme) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundColor(.green)
+                .font(.system(size: 18))
             Text(text)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(theme.text)
@@ -352,17 +345,15 @@ struct QuestionModalView: View {
     }
 
     // MARK: - Footer azioni
-
     @ViewBuilder
     private func footerActions(theme: AppTheme) -> some View {
         HStack(spacing: 12) {
-
             if !gameViewModel.answerVisible {
                 Button {
                     withAnimation { gameViewModel.answerVisible = true }
                 } label: {
                     Text("Mostra risposta")
-                        .font(.system(size: 15))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundColor(theme.textMuted)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
@@ -373,54 +364,52 @@ struct QuestionModalView: View {
                                 .stroke(theme.border, lineWidth: 1)
                         )
                 }
+                .buttonStyle(.plain)
             }
 
             Spacer()
 
+            // Sbagliato
             Button {
                 stopAudio()
                 gameViewModel.markWrong()
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .bold))
                     Text("Sbagliato")
+                        .font(.system(size: 15, weight: .semibold))
                 }
-                .font(.system(size: 15))
-                .foregroundColor(.red)
+                .foregroundColor(.white)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(Color.red.opacity(0.08))
+                .background(Color.red.opacity(0.75))
                 .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                )
             }
+            .buttonStyle(.plain)
 
+            // Corretto
             Button {
                 stopAudio()
                 gameViewModel.markCorrect()
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .bold))
                     Text("Corretto")
+                        .font(.system(size: 15, weight: .semibold))
                 }
-                .font(.system(size: 15))
-                .foregroundColor(.green)
+                .foregroundColor(.white)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
-                .background(Color.green.opacity(0.08))
+                .background(Color.green.opacity(0.75))
                 .cornerRadius(10)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                )
             }
+            .buttonStyle(.plain)
         }
     }
 
     // MARK: - Audio helpers
-
     private func toggleAudio() {
         guard let url = mediaURL else { return }
         if isPlaying {
@@ -452,7 +441,6 @@ struct QuestionModalView: View {
             guard let player = audioPlayer else { return }
             currentTime = player.currentTime
             if !player.isPlaying {
-                // Finito di suonare
                 isPlaying = false
                 currentTime = 0
                 stopTimer()
@@ -470,17 +458,8 @@ struct QuestionModalView: View {
         return String(format: "%d:%02d", t / 60, t % 60)
     }
 
-    // MARK: - Helpers
-
     private func optionLabel(order: Int) -> String {
-        ["A", "B", "C", "D"][safe: order - 1] ?? "\(order)"
+        (order >= 1 && order <= 4) ? ["A", "B", "C", "D"][order - 1] : "\(order)"
     }
 }
 
-// MARK: - Safe subscript
-
-extension Array {
-    subscript(safe index: Int) -> Element? {
-        indices.contains(index) ? self[index] : nil
-    }
-}
